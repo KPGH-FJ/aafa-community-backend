@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 用户模型
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      String   @default("USER")
+  avatar    String?
+  bio       String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  articles       Article[]
+  eventRegisters EventRegister[]
+
+  @@map("users")
+}
+
+// 文章模型
+model Article {
+  id          String   @id @default(uuid())
+  title       String
+  slug        String   @unique
+  excerpt     String
+  content     String
+  coverImage  String?  @map("cover_image")
+  category    String
+  tags        String   @default("")
+  publishedAt DateTime @default(now()) @map("published_at")
+  readTime    Int      @default(5) @map("read_time")
+  featured    Boolean  @default(false)
+  status      String   @default("DRAFT")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  authorId String @map("author_id")
+  author   User   @relation(fields: [authorId], references: [id])
+
+  @@index([category])
+  @@index([status])
+  @@map("articles")
+}
+
+// 活动模型
+model Event {
+  id               String   @id @default(uuid())
+  title            String
+  description      String
+  coverImage       String?  @map("cover_image")
+  date             DateTime
+  time             String
+  location         String
+  status           String   @default("UPCOMING")
+  maxAttendees     Int?     @map("max_attendees")
+  currentAttendees Int      @default(0) @map("current_attendees")
+  price            Int      @default(0)
+  tags             String   @default("")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  registers EventRegister[]
+
+  @@index([status])
+  @@map("events")
+}
+
+// 活动报名模型
+model EventRegister {
+  id        String   @id @default(uuid())
+  name      String
+  email     String
+  phone     String?
+  remark    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  eventId String @map("event_id")
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId  String? @map("user_id")
+  user    User?   @relation(fields: [userId], references: [id])
+
+  @@unique([eventId, email])
+  @@map("event_registers")
+}
+
+// Newsletter 订阅模型
+model Newsletter {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("newsletters")
+}
