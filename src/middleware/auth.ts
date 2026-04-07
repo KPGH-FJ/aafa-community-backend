@@ -3,7 +3,13 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../utils/prisma';
 import { JwtPayload } from '../types';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+// 强制要求环境变量，移除默认值
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  console.error('错误: JWT_SECRET 环境变量未设置');
+  process.exit(1);
+}
 
 // 验证 JWT token
 export const authenticate = async (

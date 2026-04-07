@@ -34,7 +34,7 @@ CREATE TABLE "articles" (
     "content" TEXT NOT NULL,
     "cover_image" TEXT,
     "category" TEXT NOT NULL,
-    "tags" TEXT[],
+    "tags" TEXT[] DEFAULT ARRAY[]::TEXT[],
     "published_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "read_time" INTEGER NOT NULL DEFAULT 5,
     "featured" BOOLEAN NOT NULL DEFAULT false,
@@ -59,7 +59,7 @@ CREATE TABLE "events" (
     "max_attendees" INTEGER,
     "current_attendees" INTEGER NOT NULL DEFAULT 0,
     "price" INTEGER NOT NULL DEFAULT 0,
-    "tags" TEXT[],
+    "tags" TEXT[] DEFAULT ARRAY[]::TEXT[],
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 

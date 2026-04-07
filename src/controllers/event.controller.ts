@@ -165,6 +165,12 @@ export const createEvent = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
+    // 转换 tags 为数组
+    let parsedTags: string[] = [];
+    if (tags) {
+      parsedTags = Array.isArray(tags) ? tags : [tags];
+    }
+
     const event: any = await prisma.event.create({
       data: {
         title,
@@ -176,7 +182,7 @@ export const createEvent = async (req: Request, res: Response): Promise<void> =>
         status: status || 'UPCOMING',
         maxAttendees,
         price: price || 0,
-        tags: tags || [],
+        tags: parsedTags,
       },
     });
 
@@ -215,6 +221,13 @@ export const updateEvent = async (req: Request, res: Response): Promise<void> =>
     // 转换日期
     if (updateData.date) {
       updateData.date = new Date(updateData.date);
+    }
+
+    // 转换 tags 为数组
+    if (updateData.tags) {
+      updateData.tags = Array.isArray(updateData.tags) 
+        ? updateData.tags 
+        : [updateData.tags];
     }
 
     const event: any = await prisma.event.update({
@@ -270,98 +283,115 @@ export const deleteEvent = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-// 活动报名
+// 活动报名 - 使用数据库事务修复竞态条件
 export const registerEvent = async (req: Request, res: Response): Promise<void> => {
+  const { name, email, phone, remark } = req.body;
+  const id = req.params.id as string;
+
+  // 验证必填字段
+  if (!name || !email) {
+    res.status(400).json({
+      success: false,
+      error: '姓名和邮箱为必填项',
+    } as ApiResponse);
+    return;
+  }
+
+  // 验证邮箱格式
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    res.status(400).json({
+      success: false,
+      error: '邮箱格式不正确',
+    } as ApiResponse);
+    return;
+  }
+
   try {
-    const id = req.params.id as string;
-    const { name, email, phone, remark } = req.body;
+    // 使用事务确保原子性操作，防止竞态条件
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. 检查活动是否存在
+      const event = await tx.event.findUnique({
+        where: { id },
+      });
 
-    // 验证必填字段
-    if (!name || !email) {
-      res.status(400).json({
-        success: false,
-        error: '姓名和邮箱为必填项',
-      } as ApiResponse);
-      return;
-    }
+      if (!event) {
+        return { error: '活动不存在', status: 404 };
+      }
 
-    // 检查活动是否存在
-    const event = await prisma.event.findUnique({
-      where: { id },
-    });
+      if (event.status !== 'UPCOMING') {
+        return { error: '该活动已结束或已取消', status: 400 };
+      }
 
-    if (!event) {
-      res.status(404).json({
-        success: false,
-        error: '活动不存在',
-      } as ApiResponse);
-      return;
-    }
+      // 2. 检查是否已满员（在事务中检查，防止超卖）
+      if (event.maxAttendees && event.currentAttendees >= event.maxAttendees) {
+        return { error: '该活动名额已满', status: 400 };
+      }
 
-    if (event.status !== 'UPCOMING') {
-      res.status(400).json({
-        success: false,
-        error: '该活动已结束或已取消',
-      } as ApiResponse);
-      return;
-    }
-
-    // 检查是否已满员
-    if (event.maxAttendees && event.currentAttendees >= event.maxAttendees) {
-      res.status(400).json({
-        success: false,
-        error: '该活动名额已满',
-      } as ApiResponse);
-      return;
-    }
-
-    // 检查是否已报名
-    const existingRegister = await prisma.eventRegister.findUnique({
-      where: {
-        eventId_email: {
-          eventId: id,
-          email,
+      // 3. 检查是否已报名（使用唯一约束防止重复报名）
+      const existingRegister = await tx.eventRegister.findUnique({
+        where: {
+          eventId_email: {
+            eventId: id,
+            email,
+          },
         },
-      },
+      });
+
+      if (existingRegister) {
+        return { error: '您已经报名过该活动', status: 409 };
+      }
+
+      // 4. 创建报名记录
+      const register = await tx.eventRegister.create({
+        data: {
+          name,
+          email,
+          phone,
+          remark,
+          eventId: id,
+          userId: req.user?.id,
+        },
+      });
+
+      // 5. 更新当前报名人数（原子操作）
+      await tx.event.update({
+        where: { id },
+        data: {
+          currentAttendees: {
+            increment: 1,
+          },
+        },
+      });
+
+      return { register, status: 201 };
     });
 
-    if (existingRegister) {
+    if (result.error) {
+      res.status(result.status as number).json({
+        success: false,
+        error: result.error,
+      } as ApiResponse);
+      return;
+    }
+
+    res.status(201).json({
+      success: true,
+      data: result.register,
+      message: '报名成功',
+    } as ApiResponse);
+  } catch (error: any) {
+    console.error('活动报名错误:', error);
+    
+    // 处理唯一约束冲突（并发情况下的兜底保护）
+    if (error.code === 'P2002') {
       res.status(409).json({
         success: false,
         error: '您已经报名过该活动',
       } as ApiResponse);
       return;
     }
-
-    // 创建报名记录
-    const register = await prisma.eventRegister.create({
-      data: {
-        name,
-        email,
-        phone,
-        remark,
-        eventId: id,
-        userId: req.user?.id,
-      },
-    });
-
-    // 更新当前报名人数
-    await prisma.event.update({
-      where: { id },
-      data: {
-        currentAttendees: {
-          increment: 1,
-        },
-      },
-    });
-
-    res.status(201).json({
-      success: true,
-      data: register,
-      message: '报名成功',
-    } as ApiResponse);
-  } catch (error) {
-    console.error('活动报名错误:', error);
+    
     res.status(500).json({
       success: false,
       error: '报名失败',
@@ -369,49 +399,74 @@ export const registerEvent = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-// 取消报名
+// 取消报名 - 同样使用事务
 export const cancelRegister = async (req: Request, res: Response): Promise<void> => {
+  const id = req.params.id as string;
+  const { email } = req.body;
+
+  if (!email) {
+    res.status(400).json({
+      success: false,
+      error: '邮箱为必填项',
+    } as ApiResponse);
+    return;
+  }
+
+  // 验证邮箱格式
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    res.status(400).json({
+      success: false,
+      error: '邮箱格式不正确',
+    } as ApiResponse);
+    return;
+  }
+
   try {
-    const id = req.params.id as string;
-    const { email } = req.body;
-
-    const register = await prisma.eventRegister.findUnique({
-      where: {
-        eventId_email: {
-          eventId: id,
-          email,
+    await prisma.$transaction(async (tx) => {
+      const register = await tx.eventRegister.findUnique({
+        where: {
+          eventId_email: {
+            eventId: id,
+            email,
+          },
         },
-      },
-    });
+      });
 
-    if (!register) {
-      res.status(404).json({
-        success: false,
-        error: '未找到报名记录',
-      } as ApiResponse);
-      return;
-    }
+      if (!register) {
+        throw new Error('NOT_FOUND');
+      }
 
-    await prisma.eventRegister.delete({
-      where: { id: register.id },
-    });
+      await tx.eventRegister.delete({
+        where: { id: register.id },
+      });
 
-    // 减少报名人数
-    await prisma.event.update({
-      where: { id },
-      data: {
-        currentAttendees: {
-          decrement: 1,
+      // 减少报名人数
+      await tx.event.update({
+        where: { id },
+        data: {
+          currentAttendees: {
+            decrement: 1,
+          },
         },
-      },
+      });
     });
 
     res.json({
       success: true,
       message: '取消报名成功',
     } as ApiResponse);
-  } catch (error) {
+  } catch (error: any) {
     console.error('取消报名错误:', error);
+    
+    if (error.message === 'NOT_FOUND') {
+      res.status(404).json({
+        success: false,
+        error: '未找到报名记录',
+      } as ApiResponse);
+      return;
+    }
+    
     res.status(500).json({
       success: false,
       error: '取消报名失败',

@@ -192,6 +192,12 @@ export const createArticle = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
+    // 验证 tags 是数组
+    let parsedTags: string[] = [];
+    if (tags) {
+      parsedTags = Array.isArray(tags) ? tags : [tags];
+    }
+
     // 生成 slug
     let slug = generateSlug(title);
     
@@ -212,7 +218,7 @@ export const createArticle = async (req: Request, res: Response): Promise<void> 
         content,
         coverImage,
         category,
-        tags: tags || [],
+        tags: parsedTags,
         readTime: readTime || 5,
         featured: featured || false,
         status: status || 'DRAFT',
@@ -260,6 +266,13 @@ export const updateArticle = async (req: Request, res: Response): Promise<void> 
         error: '文章不存在',
       } as ApiResponse);
       return;
+    }
+
+    // 转换 tags 为数组
+    if (updateData.tags) {
+      updateData.tags = Array.isArray(updateData.tags) 
+        ? updateData.tags 
+        : [updateData.tags];
     }
 
     // 如果更新标题，重新生成 slug
@@ -424,32 +437,21 @@ export const getCategories = async (req: Request, res: Response): Promise<void> 
 // 获取标签列表
 export const getTags = async (req: Request, res: Response): Promise<void> => {
   try {
-    const articles = await prisma.article.findMany({
-      where: {
-        status: 'PUBLISHED',
-      },
-      select: {
-        tags: true,
-      },
-    });
-
-    const tagCounts: Record<string, number> = {};
-    articles.forEach((article: any) => {
-      article.tags.forEach((tag: string) => {
-        if (tag) {
-          tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-        }
-      });
-    });
-
-    const result = Object.entries(tagCounts).map(([name, count]) => ({
-      name,
-      count,
-    }));
+    // 使用 PostgreSQL 的 unnest 函数展开数组
+    const result: any = await prisma.$queryRaw`
+      SELECT DISTINCT unnest(tags) as name, COUNT(*) as count
+      FROM articles
+      WHERE status = 'PUBLISHED'
+      GROUP BY unnest(tags)
+      ORDER BY count DESC
+    `;
 
     res.json({
       success: true,
-      data: result,
+      data: result.map((r: any) => ({
+        name: r.name,
+        count: Number(r.count),
+      })),
     } as ApiResponse);
   } catch (error) {
     console.error('获取标签错误:', error);

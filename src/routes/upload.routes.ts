@@ -1,12 +1,7 @@
 import { Router } from 'express';
-import {
-  uploadImage,
-  uploadMultipleImages,
-  deleteImage,
-  getImage,
-} from '../controllers/upload.controller';
+import { uploadImage, uploadMultipleImages, deleteImage, getImage } from '../controllers/upload.controller';
+import { uploadSingle, uploadMultiple, handleUploadError } from '../middleware/upload';
 import { authenticate, requireAdmin } from '../middleware/auth';
-import { uploadSingle, uploadMultiple } from '../middleware/upload';
 
 const router = Router();
 
@@ -15,7 +10,15 @@ router.post(
   '/image',
   authenticate,
   requireAdmin,
-  uploadSingle('image'),
+  (req, res, next) => {
+    uploadSingle(req, res, (err) => {
+      if (err) {
+        handleUploadError(err, req, res, next);
+      } else {
+        next();
+      }
+    });
+  },
   uploadImage
 );
 
@@ -24,14 +27,22 @@ router.post(
   '/images',
   authenticate,
   requireAdmin,
-  uploadMultiple('images', 5),
+  (req, res, next) => {
+    uploadMultiple(req, res, (err) => {
+      if (err) {
+        handleUploadError(err, req, res, next);
+      } else {
+        next();
+      }
+    });
+  },
   uploadMultipleImages
 );
 
+// GET /api/v1/upload/:filename - 获取图片
+router.get('/:filename', getImage);
+
 // DELETE /api/v1/upload/:filename - 删除图片（管理员）
 router.delete('/:filename', authenticate, requireAdmin, deleteImage);
-
-// GET /api/v1/upload/:filename - 获取图片（公开）
-router.get('/:filename', getImage);
 
 export default router;

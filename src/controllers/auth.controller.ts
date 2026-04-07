@@ -4,8 +4,37 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import { prisma } from '../utils/prisma';
 import { ApiResponse } from '../types';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+// 强制要求环境变量，移除默认值
+const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = (process.env.JWT_EXPIRES_IN || '7d') as jwt.SignOptions['expiresIn'];
+
+if (!JWT_SECRET) {
+  console.error('错误: JWT_SECRET 环境变量未设置');
+  process.exit(1);
+}
+
+// 密码强度验证
+const validatePassword = (password: string): { valid: boolean; error?: string } => {
+  if (password.length < 8) {
+    return { valid: false, error: '密码至少需要8个字符' };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { valid: false, error: '密码需要包含至少一个小写字母' };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, error: '密码需要包含至少一个大写字母' };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { valid: false, error: '密码需要包含至少一个数字' };
+  }
+  return { valid: true };
+};
+
+// 邮箱格式验证
+const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
 
 // 用户注册
 export const register = async (req: Request, res: Response): Promise<void> => {
@@ -21,10 +50,21 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    if (password.length < 6) {
+    // 验证邮箱格式
+    if (!validateEmail(email)) {
       res.status(400).json({
         success: false,
-        error: '密码至少需要6个字符',
+        error: '邮箱格式不正确',
+      } as ApiResponse);
+      return;
+    }
+
+    // 验证密码强度
+    const passwordCheck = validatePassword(password);
+    if (!passwordCheck.valid) {
+      res.status(400).json({
+        success: false,
+        error: passwordCheck.error,
       } as ApiResponse);
       return;
     }
@@ -43,7 +83,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     }
 
     // 加密密码
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 12); // 提高 salt rounds
 
     // 创建用户
     const user = await prisma.user.create({

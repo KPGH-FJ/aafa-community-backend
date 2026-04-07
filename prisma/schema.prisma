@@ -31,10 +31,10 @@ model Article {
   title       String
   slug        String   @unique
   excerpt     String
-  content     String   @db.Text
+  content     String
   coverImage  String?  @map("cover_image")
   category    String
-  tags        String[]
+  tags        String[] @default([])
   publishedAt DateTime @default(now()) @map("published_at")
   readTime    Int      @default(5) @map("read_time")
   featured    Boolean  @default(false)
@@ -56,7 +56,7 @@ model Article {
 model Event {
   id               String   @id @default(uuid())
   title            String
-  description      String   @db.Text
+  description      String
   coverImage       String?  @map("cover_image")
   date             DateTime
   time             String
@@ -65,7 +65,7 @@ model Event {
   maxAttendees     Int?     @map("max_attendees")
   currentAttendees Int      @default(0) @map("current_attendees")
   price            Int      @default(0)
-  tags             String[]
+  tags             String[] @default([])
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 

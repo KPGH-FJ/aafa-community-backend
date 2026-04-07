@@ -36,7 +36,7 @@ async function main() {
   });
   console.log('✓ 作者用户创建完成:', author.email);
 
-  // 创建示例文章 (PostgreSQL 使用 String[] 存储 tags)
+  // 创建示例文章 (SQLite 使用逗号分隔的字符串存储 tags)
   const articles = [
     {
       title: '实测：Cursor真的能提高3倍编程效率吗？',
@@ -58,7 +58,7 @@ Cursor确实能提高效率，但...
 `,
       coverImage: '/images/article-1.jpg',
       category: 'AI真相揭秘',
-      tags: ['Cursor', '编程工具', '效率测评'],
+      tags: 'Cursor,编程工具,效率测评',
       readTime: 8,
       featured: true,
       status: 'PUBLISHED' as const,
@@ -80,7 +80,7 @@ AI无法替代的情感交流...
 `,
       coverImage: '/images/article-2.jpg',
       category: '人文思考',
-      tags: ['AGI', '职业发展', '未来技能'],
+      tags: 'AGI,职业发展,未来技能',
       readTime: 12,
       featured: true,
       status: 'PUBLISHED' as const,
@@ -102,7 +102,7 @@ ChatGPT和Claude的配合使用...
 `,
       coverImage: '/images/article-3.jpg',
       category: '工具实操',
-      tags: ['ChatGPT', 'Claude', '数据分析'],
+      tags: 'ChatGPT,Claude,数据分析',
       readTime: 6,
       featured: false,
       status: 'PUBLISHED' as const,
@@ -124,7 +124,7 @@ ChatGPT和Claude的配合使用...
 `,
       coverImage: '/images/article-4.jpg',
       category: 'AI真相揭秘',
-      tags: ['避雷', '产品测评', '避坑指南'],
+      tags: '避雷,产品测评,避坑指南',
       readTime: 5,
       featured: false,
       status: 'PUBLISHED' as const,
@@ -146,7 +146,7 @@ GPT-5 的新特性...
 `,
       coverImage: '/images/article-5.jpg',
       category: '前沿资讯',
-      tags: ['OpenAI', 'GPT-5', '行业观察'],
+      tags: 'OpenAI,GPT-5,行业观察',
       readTime: 15,
       featured: false,
       status: 'PUBLISHED' as const,
@@ -168,7 +168,7 @@ AI辅助写作技巧...
 `,
       coverImage: '/images/article-6.jpg',
       category: '工具实操',
-      tags: ['自媒体', '内容创作', 'AI工具'],
+      tags: '自媒体,内容创作,AI工具',
       readTime: 10,
       featured: false,
       status: 'PUBLISHED' as const,
@@ -198,7 +198,7 @@ AI辅助写作技巧...
       maxAttendees: 20,
       currentAttendees: 15,
       price: 49,
-      tags: ['线下活动', '工具分享', '社交'],
+      tags: '线下活动,工具分享,社交',
     },
     {
       title: 'AGI辩论赛：AI会取代程序员吗？',
@@ -211,7 +211,7 @@ AI辅助写作技巧...
       maxAttendees: 200,
       currentAttendees: 86,
       price: 0,
-      tags: ['辩论赛', '线上活动', 'AGI'],
+      tags: '辩论赛,线上活动,AGI',
     },
     {
       title: 'AI产品共创工作坊',
@@ -224,7 +224,7 @@ AI辅助写作技巧...
       maxAttendees: 12,
       currentAttendees: 8,
       price: 199,
-      tags: ['工作坊', '产品设计', '共创'],
+      tags: '工作坊,产品设计,共创',
     },
     {
       title: '第一期：AI时代的焦虑与从容',
@@ -237,7 +237,7 @@ AI辅助写作技巧...
       maxAttendees: 20,
       currentAttendees: 18,
       price: 49,
-      tags: ['线下活动', '对话', '已结束'],
+      tags: '线下活动,对话,已结束',
     },
   ];
 
