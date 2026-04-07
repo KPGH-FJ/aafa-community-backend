@@ -4,12 +4,15 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import { prisma } from '../utils/prisma';
 import { ApiResponse } from '../types';
 
-// JWT 配置 - 生产环境必须设置 JWT_SECRET
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key-for-development-only';
+// JWT 配置 - 强制要求设置 JWT_SECRET
+const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = (process.env.JWT_EXPIRES_IN || '7d') as jwt.SignOptions['expiresIn'];
 
-if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
-  console.warn('警告: 生产环境未设置 JWT_SECRET，使用默认密钥（不安全）');
+if (!JWT_SECRET) {
+  console.error('错误: JWT_SECRET 环境变量未设置，服务无法启动');
+  console.error('请运行以下命令生成密钥并设置到环境变量:');
+  console.error('node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"');
+  process.exit(1);
 }
 
 // 密码强度验证
@@ -138,14 +141,12 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     // 查找用户
-    console.log(`[登录] 尝试查找用户: ${email}`);
     let user = await prisma.user.findUnique({
       where: { email },
     });
 
     // 如果是管理员账号且不存在，自动创建
     if (!user && email === 'admin@aafa.com' && password === 'admin123456') {
-      console.log(`[登录] 管理员不存在，自动创建...`);
       const hashedPassword = await bcrypt.hash('admin123456', 10);
       user = await prisma.user.create({
         data: {
@@ -155,11 +156,9 @@ export const login = async (req: Request, res: Response): Promise<void> => {
           role: 'ADMIN',
         },
       });
-      console.log(`[登录] 管理员创建完成: ${user.id}`);
     }
 
     if (!user) {
-      console.log(`[登录] 用户不存在: ${email}`);
       res.status(401).json({
         success: false,
         error: '邮箱或密码错误',
@@ -167,12 +166,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    console.log(`[登录] 找到用户: ${user.email}, 角色: ${user.role}`);
-
     // 验证密码
-    console.log(`[登录] 验证密码, 输入: ${password}, 存储哈希: ${user.password.substring(0, 20)}...`);
     const isPasswordValid = await bcrypt.compare(password, user.password);
-    console.log(`[登录] 密码验证结果: ${isPasswordValid}`);
 
     if (!isPasswordValid) {
       res.status(401).json({
