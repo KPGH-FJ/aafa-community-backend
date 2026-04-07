@@ -21,7 +21,7 @@ import { notFoundHandler, errorHandler } from './middleware/errorHandler';
 import { handleUploadError } from './middleware/upload';
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = parseInt(process.env.PORT || '3001', 10);
 
 // 支持多来源 CORS（本地开发 + 生产环境）
 const getCorsOrigins = (): string[] => {
