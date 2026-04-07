@@ -24,8 +24,12 @@ const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
 
 // 支持多来源 CORS（本地开发 + 生产环境）
-const getCorsOrigins = (): string[] => {
-  const defaultOrigins = ['http://localhost:3000'];
+const getCorsOrigins = (): (string | RegExp)[] => {
+  const defaultOrigins: (string | RegExp)[] = [
+    'http://localhost:3000',
+    // 自动允许所有 Vercel 预览域名
+    /^https:\/\/.*\.vercel\.app$/,
+  ];
   
   // 从环境变量解析来源列表（支持逗号分隔）
   if (process.env.FRONTEND_URL) {
@@ -43,22 +47,41 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
-app.use(cors({
+// 配置 CORS
+const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
     // 允许无来源的请求（如 Postman 或移动应用）
     if (!origin) return callback(null, true);
     
-    if (corsOrigins.includes(origin)) {
+    // 检查是否匹配允许的域名
+    const isAllowed = corsOrigins.some(allowed => {
+      if (typeof allowed === 'string') {
+        return allowed === origin;
+      }
+      // 支持正则匹配
+      return allowed.test(origin);
+    });
+    
+    if (isAllowed) {
       callback(null, true);
     } else {
       console.warn(`[CORS] 拒绝来源: ${origin}`);
+      console.warn(`[CORS] 允许的域名: ${JSON.stringify(corsOrigins)}`);
       callback(new Error('CORS 策略阻止了该请求'));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+};
+
+// 全局 CORS 中间件
+app.use(cors(corsOptions));
+
+// 显式处理 OPTIONS 预检请求
+app.options('*', cors(corsOptions));
 
 app.use(morgan('dev'));
 app.use(express.json({ limit: '10mb' }));
