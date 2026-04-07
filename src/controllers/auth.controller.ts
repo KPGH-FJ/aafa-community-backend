@@ -139,9 +139,24 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     // 查找用户
     console.log(`[登录] 尝试查找用户: ${email}`);
-    const user = await prisma.user.findUnique({
+    let user = await prisma.user.findUnique({
       where: { email },
     });
+
+    // 如果是管理员账号且不存在，自动创建
+    if (!user && email === 'admin@aafa.com' && password === 'admin123456') {
+      console.log(`[登录] 管理员不存在，自动创建...`);
+      const hashedPassword = await bcrypt.hash('admin123456', 10);
+      user = await prisma.user.create({
+        data: {
+          email: 'admin@aafa.com',
+          password: hashedPassword,
+          name: 'AAFA管理员',
+          role: 'ADMIN',
+        },
+      });
+      console.log(`[登录] 管理员创建完成: ${user.id}`);
+    }
 
     if (!user) {
       console.log(`[登录] 用户不存在: ${email}`);
