@@ -138,11 +138,13 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     // 查找用户
+    console.log(`[登录] 尝试查找用户: ${email}`);
     const user = await prisma.user.findUnique({
       where: { email },
     });
 
     if (!user) {
+      console.log(`[登录] 用户不存在: ${email}`);
       res.status(401).json({
         success: false,
         error: '邮箱或密码错误',
@@ -150,8 +152,12 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    console.log(`[登录] 找到用户: ${user.email}, 角色: ${user.role}`);
+
     // 验证密码
+    console.log(`[登录] 验证密码, 输入: ${password}, 存储哈希: ${user.password.substring(0, 20)}...`);
     const isPasswordValid = await bcrypt.compare(password, user.password);
+    console.log(`[登录] 密码验证结果: ${isPasswordValid}`);
 
     if (!isPasswordValid) {
       res.status(401).json({
