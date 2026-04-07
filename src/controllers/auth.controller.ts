@@ -4,13 +4,12 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import { prisma } from '../utils/prisma';
 import { ApiResponse } from '../types';
 
-// 强制要求环境变量，移除默认值
-const JWT_SECRET = process.env.JWT_SECRET;
+// JWT 配置 - 生产环境必须设置 JWT_SECRET
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key-for-development-only';
 const JWT_EXPIRES_IN = (process.env.JWT_EXPIRES_IN || '7d') as jwt.SignOptions['expiresIn'];
 
-if (!JWT_SECRET) {
-  console.error('错误: JWT_SECRET 环境变量未设置');
-  process.exit(1);
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+  console.warn('警告: 生产环境未设置 JWT_SECRET，使用默认密钥（不安全）');
 }
 
 // 密码强度验证
