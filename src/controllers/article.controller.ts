@@ -271,21 +271,23 @@ export const updateArticle = async (req: Request, res: Response): Promise<void> 
 
     // 转换 tags 为数组
     if (updateData.tags) {
-      updateData.tags = Array.isArray(updateData.tags) 
+      const tags = Array.isArray(updateData.tags) 
         ? updateData.tags 
         : [updateData.tags];
+      (updateData as any).tags = tags;
     }
 
     // 如果更新标题，重新生成 slug
-    if (updateData.title && updateData.title !== existingArticle.title) {
-      let newSlug = generateSlug(updateData.title);
+    const titleValue = typeof updateData.title === 'string' ? updateData.title : (updateData.title as any)?.set;
+    if (titleValue && titleValue !== existingArticle.title) {
+      let newSlug = generateSlug(titleValue);
       const slugExists = await prisma.article.findUnique({
         where: { slug: newSlug },
       });
       if (slugExists && slugExists.id !== id) {
         newSlug = `${newSlug}-${Date.now()}`;
       }
-      updateData.slug = newSlug;
+      (updateData as any).slug = newSlug;
     }
 
     const article = await prisma.article.update({
@@ -361,7 +363,7 @@ export const getAllArticlesAdmin = async (req: Request, res: Response): Promise<
 
     const where: Prisma.ArticleWhereInput = {};
     if (status) {
-      where.status = status;
+      where.status = status as any;
     }
 
     const [articles, total] = await Promise.all([

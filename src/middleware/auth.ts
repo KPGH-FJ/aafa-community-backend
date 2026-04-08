@@ -4,7 +4,7 @@ import { prisma } from '../utils/prisma';
 import { JwtPayload } from '../types';
 
 // 强制要求环境变量
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET!;
 
 if (!JWT_SECRET) {
   console.error('错误: JWT_SECRET 环境变量未设置');
@@ -33,7 +33,7 @@ export const authenticate = async (
 
     const token = authHeader.substring(7);
     
-    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    const decoded = jwt.verify(token, JWT_SECRET as jwt.Secret) as JwtPayload;
     
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
@@ -103,7 +103,7 @@ export const optionalAuth = async (
     }
 
     const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    const decoded = jwt.verify(token, JWT_SECRET as jwt.Secret) as JwtPayload;
     
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
@@ -124,7 +124,7 @@ export const optionalAuth = async (
  * 生成 JWT Token
  */
 export const generateToken = (payload: JwtPayload): string => {
-  return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-  });
+  return jwt.sign(payload, JWT_SECRET as jwt.Secret, {
+    expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as jwt.SignOptions['expiresIn'],
+  } as jwt.SignOptions);
 };
