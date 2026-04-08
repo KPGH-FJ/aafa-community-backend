@@ -141,22 +141,9 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     // 查找用户
-    let user = await prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { email },
     });
-
-    // 如果是管理员账号且不存在，自动创建
-    if (!user && email === 'admin@aafa.com' && password === 'admin123456') {
-      const hashedPassword = await bcrypt.hash('admin123456', 10);
-      user = await prisma.user.create({
-        data: {
-          email: 'admin@aafa.com',
-          password: hashedPassword,
-          name: 'AAFA管理员',
-          role: 'ADMIN',
-        },
-      });
-    }
 
     if (!user) {
       res.status(401).json({

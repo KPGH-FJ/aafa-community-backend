@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 import { ApiResponse, ArticleQueryParams } from '../types';
 
@@ -27,7 +28,7 @@ export const getArticles = async (req: Request, res: Response): Promise<void> =>
     const skip = (pageNum - 1) * limitNum;
 
     // 构建查询条件
-    const where: any = {
+    const where: Prisma.ArticleWhereInput = {
       status: 'PUBLISHED',
     };
 
@@ -63,7 +64,7 @@ export const getArticles = async (req: Request, res: Response): Promise<void> =>
             },
           },
         },
-      }) as any,
+      }),
       prisma.article.count({ where }),
     ]);
 
@@ -91,7 +92,7 @@ export const getArticleById = async (req: Request, res: Response): Promise<void>
   try {
     const id = req.params.id as string;
 
-    const article: any = await prisma.article.findUnique({
+    const article = await prisma.article.findUnique({
       where: { id },
       include: {
         author: {
@@ -131,7 +132,7 @@ export const getArticleBySlug = async (req: Request, res: Response): Promise<voi
   try {
     const slug = req.params.slug as string;
 
-    const article: any = await prisma.article.findUnique({
+    const article = await prisma.article.findUnique({
       where: { slug },
       include: {
         author: {
@@ -210,7 +211,7 @@ export const createArticle = async (req: Request, res: Response): Promise<void> 
       slug = `${slug}-${Date.now()}`;
     }
 
-    const article: any = await prisma.article.create({
+    const article = await prisma.article.create({
       data: {
         title,
         slug,
@@ -253,7 +254,7 @@ export const createArticle = async (req: Request, res: Response): Promise<void> 
 export const updateArticle = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = req.params.id as string;
-    const updateData: any = { ...req.body };
+    const updateData: Prisma.ArticleUpdateInput = { ...req.body };
 
     // 检查文章是否存在
     const existingArticle = await prisma.article.findUnique({
@@ -287,7 +288,7 @@ export const updateArticle = async (req: Request, res: Response): Promise<void> 
       updateData.slug = newSlug;
     }
 
-    const article: any = await prisma.article.update({
+    const article = await prisma.article.update({
       where: { id },
       data: updateData,
       include: {
@@ -358,7 +359,7 @@ export const getAllArticlesAdmin = async (req: Request, res: Response): Promise<
     const limitNum = Math.min(50, Math.max(1, parseInt(limit)));
     const skip = (pageNum - 1) * limitNum;
 
-    const where: any = {};
+    const where: Prisma.ArticleWhereInput = {};
     if (status) {
       where.status = status;
     }
@@ -380,7 +381,7 @@ export const getAllArticlesAdmin = async (req: Request, res: Response): Promise<
             },
           },
         },
-      }) as any,
+      }),
       prisma.article.count({ where }),
     ]);
 
@@ -438,7 +439,7 @@ export const getCategories = async (req: Request, res: Response): Promise<void> 
 export const getTags = async (req: Request, res: Response): Promise<void> => {
   try {
     // 使用 PostgreSQL 的 unnest 函数展开数组
-    const result: any = await prisma.$queryRaw`
+    const result = await prisma.$queryRaw<{ name: string; count: bigint }[]>`
       SELECT DISTINCT unnest(tags) as name, COUNT(*) as count
       FROM articles
       WHERE status = 'PUBLISHED'

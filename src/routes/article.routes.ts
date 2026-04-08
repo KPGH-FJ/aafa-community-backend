@@ -11,36 +11,107 @@ import {
   getTags,
 } from '../controllers/article.controller';
 import { authenticate, requireAdmin } from '../middleware/auth';
+import {
+  validate,
+  articleSchema,
+  articleQuerySchema,
+  paginationSchema,
+} from '../middleware/validation';
+import {
+  articlesCache,
+  articleCache,
+  metadataCache,
+  clearCacheByTag,
+} from '../middleware/cache';
+import { Request, Response } from 'express';
+import logger, { logAudit } from '../utils/logger';
 
 const router = Router();
 
-// 公开接口
-// GET /api/v1/articles - 获取文章列表
-router.get('/', getArticles);
+// 公开路由（带缓存）
+router.get('/', validate(articleQuerySchema), articlesCache, getArticles);
+router.get('/categories', metadataCache, getCategories);
+router.get('/tags', metadataCache, getTags);
+router.get('/slug/:slug', articleCache, getArticleBySlug);
+router.get('/:id', articleCache, getArticleById);
 
-// GET /api/v1/articles/categories - 获取分类列表
-router.get('/categories', getCategories);
+// 管理路由（需要认证）
+router.get(
+  '/admin/all',
+  authenticate,
+  requireAdmin,
+  validate(articleQuerySchema),
+  getAllArticlesAdmin
+);
 
-// GET /api/v1/articles/tags - 获取标签列表
-router.get('/tags', getTags);
+router.post(
+  '/',
+  authenticate,
+  requireAdmin,
+  validate(articleSchema),
+  async (req, res) => {
+    try {
+      // 清除文章列表缓存
+      clearCacheByTag('articles');
+      
+      await createArticle(req, res);
+      
+      // 记录审计日志
+      logAudit('ARTICLE_CREATED', req.user!.id, {
+        title: req.body.title,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error('创建文章失败', { error, userId: req.user?.id });
+      throw error;
+    }
+  }
+);
 
-// GET /api/v1/articles/slug/:slug - 通过 slug 获取文章
-router.get('/slug/:slug', getArticleBySlug);
+router.patch(
+  '/:id',
+  authenticate,
+  requireAdmin,
+  validate(articleSchema.partial()),
+  async (req, res) => {
+    try {
+      // 清除相关缓存
+      clearCacheByTag('articles');
+      clearCacheByTag(`article:${req.params.id}`);
+      
+      await updateArticle(req, res);
+      
+      logAudit('ARTICLE_UPDATED', req.user!.id, {
+        articleId: req.params.id,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error('更新文章失败', { error, userId: req.user?.id, articleId: req.params.id });
+      throw error;
+    }
+  }
+);
 
-// GET /api/v1/articles/:id - 获取单篇文章
-router.get('/:id', getArticleById);
-
-// 管理员接口
-// GET /api/v1/articles/admin/all - 获取所有文章（包含草稿）
-router.get('/admin/all', authenticate, requireAdmin, getAllArticlesAdmin);
-
-// POST /api/v1/articles - 创建文章
-router.post('/', authenticate, requireAdmin, createArticle);
-
-// PATCH /api/v1/articles/:id - 更新文章
-router.patch('/:id', authenticate, requireAdmin, updateArticle);
-
-// DELETE /api/v1/articles/:id - 删除文章
-router.delete('/:id', authenticate, requireAdmin, deleteArticle);
+router.delete(
+  '/:id',
+  authenticate,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      clearCacheByTag('articles');
+      clearCacheByTag(`article:${req.params.id}`);
+      
+      await deleteArticle(req, res);
+      
+      logAudit('ARTICLE_DELETED', req.user!.id, {
+        articleId: req.params.id,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error('删除文章失败', { error, userId: req.user?.id, articleId: req.params.id });
+      throw error;
+    }
+  }
+);
 
 export default router;
